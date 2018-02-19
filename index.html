@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html>
+	<body>
+	<script src="https://aframe.io/releases/0.7.0/aframe.min.js"></script>
+	<script src="https://sdk.altvr.com/libs/altspace.js/2.8.1/altspace.min.js"></script>
+	<script src="https://www.gstatic.com/firebasejs/4.10.0/firebase.js"></script>
+	
+	<script>
+	// Initialize Firebase
+	var config = {
+		apiKey: "AIzaSyA14H0ssfcQ0gLDXQ5aW8VTcwh76gr4rUk",
+		authDomain: "vrmazemaker.firebaseapp.com",
+		databaseURL: "https://vrmazemaker.firebaseio.com",
+		projectId: "vrmazemaker",
+		storageBucket: "vrmazemaker.appspot.com",
+		messagingSenderId: "379591366260"
+	};
+	firebase.initializeApp(config);
+	</script>
+	
+	<script>
+		AFRAME.registerComponent('on-click',{
+			schema:
+			{
+				xPos:{ type:'int' },
+				zPos:{ type:'int' }
+			},
+			init: function(){
+				const self = this;
+				const xP = self.data.xPos;
+				const zP = self.data.zPos;
+				
+				this.el.addEventListener('click', function(e){
+
+					if (checkTile(xP, zP) == 10){
+						console.log("BOOM YOU DED");
+						viewTiles();
+					}
+					else
+					{
+						console.log(xP + " | " + zP);
+						console.log(checkTile(xP, zP));
+						revealed[zP*Z_TILES+xP] = true;
+						
+						if (checkTile(xP, zP) == 0 ){
+							revealTiles(xP, zP);
+						}
+						else
+						{
+							setTexture(this, checkTile(xP, zP));
+						}
+					}
+				});
+			}
+		});
+		AFRAME.registerComponent('reset-click',{
+			init: function(){
+				const self = this;
+				const xP = self.data.xPos;
+				const zP = self.data.zPos;
+				
+				this.el.addEventListener('click', function(e){
+					console.log("reset");
+					resetVars();
+					initialiseArray();
+					setTileValue();
+				});
+			}
+		});
+		AFRAME.registerComponent('flag-click',{
+			init: function(){
+				const self = this;
+				
+				this.el.addEventListener('click', function(e){
+					console.log("flag:" + flagging);
+					flagging = !flagging;
+				});
+			}
+		});
+	</script>
+	
+	<a-scene altspace="fullspace:false; verticalAlign:bottom">
+	
+		<a-assets>
+			<img id='mUnclick' src='assets/unclickedtile.png'/>
+			<img id='m0' src='assets/m0.png'/>
+			<img id='m1' src='assets/m1.png'/>
+			<img id='m2' src='assets/m2.png'/> 
+			<img id='m3' src='assets/m3.png'/> 
+			<img id='m4' src='assets/m4.png'/> 
+			<img id='m5' src='assets/m5.png'/> 
+			<img id='m6' src='assets/m6.png'/> 
+			<img id='m7' src='assets/m7.png'/> 
+			<img id='m8' src='assets/m8.png'/>
+			<img id='mMine' src='assets/m_mine.png'/> 
+		</a-assets>
+	
+		<a-box position='-2 1 -2' reset-click color='green'></a-box>
+		<a-box position='-1 1 -2' flag-click color='blue'></a-box>
+	
+	</a-scene>
+	
+	</body>
+	
+	<script>
+	
+		const sim = new altspace.utilities.Simulation();
+		const scene = document.querySelector('a-scene');
+	
+		const X_TILES = 15;
+		const Z_TILES = 15;
+		const MINES_VALUE = 30;
+		const TILE_SIZE = 0.2;
+		const DB_REF = new Firebase("https://vrmazemaker.firebaseio.com");
+		
+		var tiles = [];
+		var tileObjects = [];
+		var revealed = [];
+		
+		var flagging = false;
+		//=====================================================
+		
+		main();
+		
+		function main(){
+			console.log("Main");
+			initialiseArray();
+			renderTiles();
+			setTileValue();
+		}
+		
+		function resetVars(){
+			tileObjects.forEach(function(item){
+				setTexture(item, 90);
+				
+			});
+			console.log("Reset!");
+		}
+		
+		function initialiseArray(){
+			for (var z=0; z<(Z_TILES*X_TILES); z++){
+				tiles[z] = 0;
+				revealed[z] = false;
+			}
+		}
+		
+		//-----
+		
+		function revealTiles(xP, zP){
+			//This is a tad messy but it works!!
+			console.log("revealing tiles");
+
+			for (var loop=0; loop<X_TILES; loop++){
+				for (var i=0; i<X_TILES; i++){
+					for (var j=0; j<Z_TILES; j++){
+						var t = i*X_TILES+j;
+						if (revealed[t] && tiles[t]==0){
+							var counter = 0;
+							revealed[(i+1)*Z_TILES + j] = true;
+							revealed[(i-1)*Z_TILES + j] = true;
+							if((i*Z_TILES +j) %Z_TILES != 0){
+								revealed[i*Z_TILES + j-1] = true;
+								revealed[(i+1)*Z_TILES + j-1] = true;
+								revealed[(i-1)*Z_TILES + j-1] = true;
+							}
+							if ((i*Z_TILES + j) %Z_TILES != Z_TILES-1 ){
+								revealed[(i-1)*Z_TILES + j+1] = true;
+								revealed[i*Z_TILES + j+1] = true;
+								revealed[(i+1)*Z_TILES + j+1] = true;
+							}
+						}
+						if(revealed[t]&& tiles[t]!=10){
+							setTexture(tileObjects[t],tiles[t]);
+						}
+					}
+				}
+			}
+			
+
+		}//end function
+		
+		//------
+		
+		function checkTile(x,z){
+			return tiles[X_TILES*z + x];
+		}
+		
+		function setTileValue(){
+
+			//Set mines first...
+			for (var i=0; i<MINES_VALUE; i++){
+				var mineZ = Math.floor(Math.random()*Z_TILES);
+				var mineX = Math.floor(Math.random()*X_TILES);
+				
+				var mineNo = (X_TILES*mineX)+mineZ;
+				//mineNo = 14; //testing
+				
+				console.log(mineZ + " | " + mineX);
+				
+				if (tiles[mineNo] == 10){
+					console.log("dup mine");
+					i--;
+				}
+				tiles[mineNo] = 10;
+			}
+			//-------
+			//Set tile values...
+			for (var z=0; z<Z_TILES; z++){
+				for (var x=0; x<X_TILES; x++){
+					
+					if (tiles[x*X_TILES + z] == 10){
+						console.log("Tile is mine");
+					}
+					else
+					{
+						var counter = 0;
+						if (tiles[(x+1)*Z_TILES + z] == 10){counter++} //above
+						if (tiles[(x-1)*Z_TILES + z] == 10){counter++} //below
+						
+						if((x*Z_TILES +z) %Z_TILES != 0){
+							if (tiles[(x+1)*Z_TILES + (z-1)] == 10){counter++} //top right
+							if (tiles[(x-1)*Z_TILES + (z-1)] == 10){counter++} //bottom right
+							if (tiles[(x)*Z_TILES   + (z-1)] == 10){counter++} //right
+						}
+						if((x*Z_TILES +z) %Z_TILES != Z_TILES-1){
+							if (tiles[(x+1)*Z_TILES + (z+1)] == 10){counter++} //top left
+							if (tiles[(x-1)*Z_TILES + (z+1)] == 10){counter++} //bottom left
+							if (tiles[(x)*Z_TILES   + (z+1)] == 10){counter++} //left
+						}
+						tiles[x*Z_TILES + z] = counter;
+					}
+				}
+			}
+		}//end function
+		
+		function viewTiles(){
+			var count = 0;
+			tileObjects.forEach(function(item){
+				setTexture(item, tiles[count]);
+				count++;
+			});
+		}
+
+		function renderTiles(){
+			for (var z=0; z<Z_TILES; z++){
+				for (var x=0; x<X_TILES; x++){
+					var tile = document.createElement('a-box');
+					tile.setAttribute('scale', TILE_SIZE+' '+TILE_SIZE+' '+TILE_SIZE);
+					tile.setAttribute('position', x*TILE_SIZE +' 0.2 '+ z*TILE_SIZE);
+					tile.setAttribute('material', 'shader: flat; src: #mUnclick');
+					tile.setAttribute('on-click', 'xPos:'+x+';zPos:'+z);
+					
+					tileObjects.push(tile);
+					scene.appendChild(tile);
+				}
+			}//end for
+		}//end function
+
+		function setTexture(tile, val){
+			//console.log(val);
+			switch(val){
+				case 0:
+					tile.setAttribute('material','shader: flat; src: #m0');
+				break;
+				case 1:
+					tile.setAttribute('material','shader: flat; src: #m1');
+				break;
+				case 2:
+					tile.setAttribute('material','shader: flat; src: #m2');
+				break;
+				case 3:
+					tile.setAttribute('material','shader: flat; src: #m3');
+				break;
+				case 4:
+					tile.setAttribute('material','shader: flat; src: #m4');
+				break;
+				case 5:
+					tile.setAttribute('material','shader: flat; src: #m5');
+				break;
+				case 6:
+					tile.setAttribute('material','shader: flat; src: #m6');
+				break;
+				case 7:
+					tile.setAttribute('material','shader: flat; src: #m7');
+				break;
+				case 8:
+					tile.setAttribute('material','shader: flat; src: #m8');
+				break;
+				case 10:
+					tile.setAttribute('material','shader: flat; src: #mMine');
+				break;
+				default:
+					tile.setAttribute('material','shader: flat; src: #mUnclick');
+				break;
+			}
+		}
+		
+	</script>
+	
+	
