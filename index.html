@@ -92,11 +92,22 @@
 			<img id='m6' src='assets/m6.png'/> 
 			<img id='m7' src='assets/m7.png'/> 
 			<img id='m8' src='assets/m8.png'/>
-			<img id='mMine' src='assets/m_mine.png'/> 
+			<img id='mMine' src='assets/m_mine.png'/>
+			<img id='lose' src='assets/loseFace.png'/> 			
 		</a-assets>
 	
 		<a-box position='-2 1 -2' reset-click color='green'></a-box>
 		<a-box position='-1 1 -2' flag-click color='blue'></a-box>
+		
+		<a-box position='0 2 0' color='white' src='#lose'>
+			<a-animation attribute="rotation"
+               dur="50000"
+               fill="forwards"
+               to="0 360 0"
+               repeat="indefinite"
+			   easing="linear"
+			></a-animation>
+		</a-box>
 	
 	</a-scene>
 	
